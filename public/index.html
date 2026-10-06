@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head><title>Voice Commander</title></head>
+<body>
+  <h1>Voice Incident Commander</h1>
+  <button id="start">Start Mic</button>
+  <button id="stop">Stop / Barge-in</button>
+  <script>
+    const ws = new WebSocket('ws://localhost:3000');
+    let currentGenerationId = null;
+
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'tts_chunk') {
+        if (msg.generationId === currentGenerationId) {
+          console.log('Playing audio chunk');
+        } else {
+          console.warn('Discarded stale audio chunk from cancelled generation');
+        }
+      }
+    };
+
+    document.getElementById('start').onclick = () => {
+      console.log('Mic started (dummy)');
+      ws.send(JSON.stringify({ type: 'audio_chunk' }));
+      currentGenerationId = 0; // Sync with server for MVP demo
+    };
+
+    document.getElementById('stop').onclick = () => {
+      console.log('Barge-in sent');
+      ws.send(JSON.stringify({ type: 'barge_in' }));
+      currentGenerationId++; // Invalidate locally
+    };
+  </script>
+</body>
+</html>
