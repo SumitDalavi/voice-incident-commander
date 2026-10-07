@@ -16,18 +16,18 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 // Setup Clients
-const sttClient = new speech.SpeechClient();
-const ttsClient = new textToSpeech.TextToSpeechClient();
+const sttClient = process.env.LLM_API_KEY ? new speech.SpeechClient() : null;
+const ttsClient = process.env.LLM_API_KEY ? new textToSpeech.TextToSpeechClient() : null;
 const genAI = process.env.LLM_API_KEY ? new GoogleGenerativeAI(process.env.LLM_API_KEY) : null;
 const model = genAI ? genAI.getGenerativeModel({ model: process.env.LLM_MODEL || 'gemini-1.5-flash' }) : null;
 
 const INCIDENT_API_URL = process.env.INCIDENT_API_URL || 'http://localhost:4000';
 const MESH_COORDINATOR_URL = process.env.MESH_COORDINATOR_URL || 'http://localhost:3000';
 
-const activeProposals = new Map();
-
 wss.on('connection', (ws) => {
   console.log('Client connected for Voice Commander');
+  const activeProposals = new Map();
+  let currentTtsController = null;
   let currentGenerationId = 0;
   let isGenerating = false;
   let recognizeStream = null;
@@ -89,11 +89,21 @@ wss.on('connection', (ws) => {
         if (actionMatch) {
           actionProposal = JSON.parse(actionMatch[1]);
           actionProposal.id = crypto.randomUUID();
-          activeProposals.set(actionProposal.id, actionProposal);
+          const timer = setTimeout(() => {
+            activeProposals.delete(actionProposal.id);
+          }, 60000); // 60 seconds expiry
+          activeProposals.set(actionProposal.id, { data: actionProposal, timer });
           responseText = fullResponse.replace(/<ACTION>.*?<\/ACTION>/, '').trim();
         } else {
           responseText = fullResponse.trim();
         }
+      } else {
+        responseText = "I received your message but no LLM is configured. Sending mock proposal.";
+        actionProposal = { id: crypto.randomUUID(), task: 'restart-service' };
+        const timer = setTimeout(() => {
+          activeProposals.delete(actionProposal.id);
+        }, 60000);
+        activeProposals.set(actionProposal.id, { data: actionProposal, timer });
       }
 
       if (genId !== currentGenerationId) return; // Barge-in
@@ -111,11 +121,22 @@ wss.on('connection', (ws) => {
         audioConfig: { audioEncoding: 'MP3' },
       };
 
-      const [ttsResponse] = await ttsClient.synthesizeSpeech(request);
+      if (currentTtsController) {
+        currentTtsController.abort();
+      }
+      currentTtsController = new AbortController();
+
+      let ttsResponse = null;
+      if (ttsClient) {
+          try {
+             const [res] = await ttsClient.synthesizeSpeech(request, { signal: currentTtsController.signal });
+             ttsResponse = res;
+          } catch(e) {}
+      }
       
       if (genId !== currentGenerationId) return;
       
-      const audioBuffer = ttsResponse.audioContent;
+      const audioBuffer = ttsResponse ? ttsResponse.audioContent : Buffer.from('mock-audio-data');
       ws.send(JSON.stringify({ type: 'tts_chunk', generationId: genId, audio: audioBuffer.toString('base64') }));
       isGenerating = false;
       
@@ -131,6 +152,7 @@ wss.on('connection', (ws) => {
         console.log(`Barge-in detected. Canceling turn ${currentGenerationId}.`);
         currentGenerationId++; 
         isGenerating = false;
+        if (currentTtsController) currentTtsController.abort();
       }
       if (!recognizeStream) startRecognizeStream();
       recognizeStream.write(message);
@@ -139,6 +161,7 @@ wss.on('connection', (ws) => {
       if (data.type === 'barge_in') {
         currentGenerationId++; 
         isGenerating = false;
+        if (currentTtsController) currentTtsController.abort();
         if (recognizeStream) {
           recognizeStream.end();
           recognizeStream = null;
@@ -151,12 +174,13 @@ wss.on('connection', (ws) => {
           console.error("Attempted to approve unknown or expired proposal.");
           return;
         }
-        console.log("Action approved:", storedProposal.id);
+        clearTimeout(storedProposal.timer);
+        console.log("Action approved:", storedProposal.data.id);
         axios.post(`${MESH_COORDINATOR_URL}/api/dispatch`, {
           incidentId: "INC-1001",
-          tasks: [storedProposal.task]
+          tasks: [storedProposal.data.task]
         }).catch(e => console.error("Coordinator error", e.message));
-        activeProposals.delete(storedProposal.id);
+        activeProposals.delete(data.proposal.id);
       }
     }
   });

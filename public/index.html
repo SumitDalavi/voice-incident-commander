@@ -99,11 +99,14 @@
           }
           try {
             const audioBuffer = await audioCtx.decodeAudioData(bytes.buffer);
-            const source = audioCtx.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(audioCtx.destination);
-            source.start();
-            playingSources.push(source);
+            // Re-check generation ID because decode is async and could have been interrupted
+            if (msg.generationId === currentGenerationId) {
+              const source = audioCtx.createBufferSource();
+              source.buffer = audioBuffer;
+              source.connect(audioCtx.destination);
+              source.start();
+              playingSources.push(source);
+            }
           } catch(e) {
             console.error("Audio decode error", e);
           }

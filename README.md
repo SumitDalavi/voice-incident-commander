@@ -66,3 +66,12 @@ See the [DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) for the interactive walkthrough an
 
 ---
 *Built with a focus on robust patterns, not toy demos.*
+
+
+## October 2026 Update: Behavioral Testing & Runtime Stabilization
+
+**Implementation Notes:**
+Updated test.js to a full behavioral WebSocket client simulating real SRE interactions. Implemented TTS barge-in logic for real-time aborts.
+
+* Acceptance tests have been upgraded from static string-checks to end-to-end behavioral verifications.
+* API boundaries and execution layers (Docker, WebSockets, Temporal, etc.) are now explicitly exercised in tests.
