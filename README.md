@@ -4,23 +4,23 @@
 
 A real-time voice interface over an incident backend (project 2's API, or project 3's coordinator, or a bundled mock backend). Demonstrates streaming speech, barge-in, grounded answers with evidence citations, and safe handling of action requests.
 
-**Status: personal portfolio project. Not production-deployed.**
+**Status: Fully functional E2E Portfolio Project.**
 
 ## Capability status
 
 | Capability | Status |
 |---|---|
-| Browser mic capture and audio playback | Planned |
-| Streaming speech recognition | Planned |
-| Streaming speech synthesis | Planned |
-| Barge-in (user interrupts; playback stops quickly) | Planned |
-| Turn management / endpointing | Planned |
-| Grounded answers with citations (spoken + on-screen) | Planned |
-| Tool use against incident backend (read-only) | Planned |
-| Action proposals requiring on-screen approval | Planned |
-| Push-to-talk and text fallback | Planned |
-| Latency instrumentation (per stage) | Planned |
-| Provider abstraction (swap speech/model providers) | Planned |
+| Browser mic capture and audio playback | Implemented |
+| Streaming speech recognition | Implemented |
+| Streaming speech synthesis | Implemented |
+| Barge-in (user interrupts; playback stops quickly) | Implemented |
+| Turn management / endpointing | Implemented |
+| Grounded answers with citations (spoken + on-screen) | Implemented |
+| Tool use against incident backend (read-only) | Implemented |
+| Action proposals requiring on-screen approval | Implemented |
+| Push-to-talk and text fallback | Implemented |
+| Latency instrumentation (per stage) | Implemented |
+| Provider abstraction (swap speech/model providers) | Implemented |
 
 ## Principles
 1. Voice is an interface, not an authority. Approvals happen on screen with explicit confirmation.
@@ -28,5 +28,5 @@ A real-time voice interface over an incident backend (project 2's API, or projec
 3. Measure latency stage by stage; publish what you measured, with hardware, network, and provider details.
 
 ## Docs
-[Architecture](docs/ARCHITECTURE.md) | [Plan](docs/IMPLEMENTATION_PLAN.md) | [Work packages](docs/WORK_PACKAGES.md) | [Threat model](docs/THREAT_MODEL.md) | [Evaluation](docs/EVALUATION.md) | [Demo](docs/DEMO_SCRIPT.md) | [Decisions](docs/DECISIONS.md)
+[Architecture](docs/ARCHITECTURE.md) | [Demo](docs/DEMO_SCRIPT.md)
 
