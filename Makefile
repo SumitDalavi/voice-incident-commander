@@ -5,3 +5,6 @@ setup:
 
 dev:
 	npm start
+
+test:
+	node test.js

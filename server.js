@@ -21,8 +21,10 @@ const ttsClient = new textToSpeech.TextToSpeechClient();
 const genAI = process.env.LLM_API_KEY ? new GoogleGenerativeAI(process.env.LLM_API_KEY) : null;
 const model = genAI ? genAI.getGenerativeModel({ model: process.env.LLM_MODEL || 'gemini-1.5-flash' }) : null;
 
-const INCIDENT_API_URL = process.env.INCIDENT_API_URL || 'http://localhost:8081';
-const MESH_COORDINATOR_URL = process.env.MESH_COORDINATOR_URL || 'http://localhost:3000'; // Mesh coordinator is on 3000 in reality. Wait, this server runs on 4005 to avoid port collision.
+const INCIDENT_API_URL = process.env.INCIDENT_API_URL || 'http://localhost:4000';
+const MESH_COORDINATOR_URL = process.env.MESH_COORDINATOR_URL || 'http://localhost:3000';
+
+const activeProposals = new Map();
 
 wss.on('connection', (ws) => {
   console.log('Client connected for Voice Commander');
@@ -87,6 +89,7 @@ wss.on('connection', (ws) => {
         if (actionMatch) {
           actionProposal = JSON.parse(actionMatch[1]);
           actionProposal.id = crypto.randomUUID();
+          activeProposals.set(actionProposal.id, actionProposal);
           responseText = fullResponse.replace(/<ACTION>.*?<\/ACTION>/, '').trim();
         } else {
           responseText = fullResponse.trim();
@@ -105,7 +108,7 @@ wss.on('connection', (ws) => {
       const request = {
         input: { text: responseText },
         voice: { languageCode: 'en-US', name: 'en-US-Standard-A' },
-        audioConfig: { audioEncoding: 'LINEAR16', sampleRateHertz: 16000 },
+        audioConfig: { audioEncoding: 'MP3' },
       };
 
       const [ttsResponse] = await ttsClient.synthesizeSpeech(request);
@@ -113,22 +116,8 @@ wss.on('connection', (ws) => {
       if (genId !== currentGenerationId) return;
       
       const audioBuffer = ttsResponse.audioContent;
-      const chunkSize = 16000 * 2; // 1 second chunks approx
-      let offset = 44; // skip WAV header if present, though LINEAR16 doesn't have one natively from TTS usually if not requested, but let's assume it's raw PCM
-      
-      const sendNextChunk = () => {
-        if (genId !== currentGenerationId) return;
-        if (offset >= audioBuffer.length) {
-          isGenerating = false;
-          return;
-        }
-        const chunk = audioBuffer.subarray(offset, offset + chunkSize);
-        ws.send(JSON.stringify({ type: 'tts_chunk', generationId: genId, audio: chunk.toString('base64') }));
-        offset += chunkSize;
-        setTimeout(sendNextChunk, 200);
-      };
-      
-      sendNextChunk();
+      ws.send(JSON.stringify({ type: 'tts_chunk', generationId: genId, audio: audioBuffer.toString('base64') }));
+      isGenerating = false;
       
     } catch (e) {
       console.error(e);
@@ -157,11 +146,17 @@ wss.on('connection', (ws) => {
       } else if (data.type === 'text_input') {
         handleUserUtterance(data.text);
       } else if (data.type === 'approve_action') {
-        console.log("Action approved:", data.proposal.id);
+        const storedProposal = activeProposals.get(data.proposal.id);
+        if (!storedProposal) {
+          console.error("Attempted to approve unknown or expired proposal.");
+          return;
+        }
+        console.log("Action approved:", storedProposal.id);
         axios.post(`${MESH_COORDINATOR_URL}/api/dispatch`, {
           incidentId: "INC-1001",
-          tasks: [data.proposal.task]
+          tasks: [storedProposal.task]
         }).catch(e => console.error("Coordinator error", e.message));
+        activeProposals.delete(storedProposal.id);
       }
     }
   });

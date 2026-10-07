@@ -34,7 +34,7 @@
   </div>
 
   <script>
-    const ws = new WebSocket('ws://localhost:3000');
+    const ws = new WebSocket('ws://localhost:4005');
     let currentGenerationId = null;
     let mediaRecorder = null;
     
@@ -65,8 +65,28 @@
         div.className = 'agent-msg';
         div.style.border = '1px solid var(--accent)';
         div.style.padding = '10px';
-        div.innerHTML = `<strong>Action Proposed:</strong> ${msg.proposal.task}<br>
-        <button onclick="approveAction('${msg.proposal.id}', '${msg.proposal.task}')" style="margin-top: 10px; padding: 5px; background: var(--accent); color: black; border: none; border-radius: 4px; cursor: pointer;">Approve Execution</button>`;
+        
+        const strong = document.createElement('strong');
+        strong.textContent = 'Action Proposed: ';
+        div.appendChild(strong);
+        
+        const taskText = document.createTextNode(msg.proposal.task);
+        div.appendChild(taskText);
+        
+        div.appendChild(document.createElement('br'));
+        
+        const btn = document.createElement('button');
+        btn.textContent = 'Approve Execution';
+        btn.style.marginTop = '10px';
+        btn.style.padding = '5px';
+        btn.style.background = 'var(--accent)';
+        btn.style.color = 'black';
+        btn.style.border = 'none';
+        btn.style.borderRadius = '4px';
+        btn.style.cursor = 'pointer';
+        btn.onclick = () => approveAction(msg.proposal.id, msg.proposal.task);
+        
+        div.appendChild(btn);
         transcriptEl.appendChild(div);
         transcriptEl.scrollTop = transcriptEl.scrollHeight;
       } else if (msg.type === 'tts_chunk') {
