@@ -81,3 +81,8 @@ Updated test.js to a full behavioral WebSocket client simulating real SRE intera
 - **WebSocket Binary Audio**: Implemented true `LINEAR16` PCM audio capturing using `AudioContext` in the browser, streaming it bidirectionally and seamlessly over WebSockets.
 - **Robust Barge-in Pipeline**: Implemented precise generation ID tracking. Interrupting the voice agent now safely flushes downstream TTS buffers and instantly aborts active LLM requests without hanging.
 - **E2E Acceptance Testing**: Integration tests now execute against real external APIs, asserting correctly structured payloads and dynamic model behavior instead of hardcoded strings.
+
+## Maturity Claims
+- **Implemented (Tested):** Real DOM browser testing with Puppeteer, AbortController provider cancellation, valid audio fixtures.
+- **Mocked:** The Google AI backend defaults to mock JSON strings when an API key is missing.
+- **Deferred:** High-fidelity multi-speaker identification.
