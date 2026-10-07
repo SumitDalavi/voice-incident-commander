@@ -21,7 +21,7 @@ async function runTests() {
   const mockCoord = mockCoordApp.listen(3000);
 
   try {
-    const ws1 = new WebSocket('ws://localhost:4005');
+    const ws1 = new WebSocket('ws://127.0.0.1:4005');
     
     await new Promise((resolve) => ws1.on('open', resolve));
     
@@ -44,7 +44,7 @@ async function runTests() {
     console.log(`Received Proposal ID: ${proposalId}. Attempting cross-session approval...`);
     
     // Connect second session
-    const ws2 = new WebSocket('ws://localhost:4005');
+    const ws2 = new WebSocket('ws://127.0.0.1:4005');
     await new Promise((resolve) => ws2.on('open', resolve));
 
     // Wait for console.error output or just ensure server doesn't crash

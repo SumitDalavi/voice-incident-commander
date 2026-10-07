@@ -196,4 +196,4 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(4005, () => console.log('Voice UI running on http://localhost:4005'));
+server.listen(4005, '127.0.0.1', () => console.log('Voice UI running on http://127.0.0.1:4005'));
