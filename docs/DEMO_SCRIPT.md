@@ -8,4 +8,4 @@
 4. **Listen**: The browser will begin playing the binary audio chunks (or simulating it if strict mocked WAV headers are used).
 5. **Test Barge-in**: 
    - While the bot is speaking (or generating), press the Microphone button again.
-   - Observe the transcript: the generation is immediately cancelled, audio nodes are stopped, and stale chunks are logged as discarded.
+   - Observe the transcript: the generation is immediately cancelled, audio nodes are stopped, and stale chunks are logged as discarded. Backend LLM/TTS execution is forcefully halted using an `AbortController`.

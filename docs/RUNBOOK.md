@@ -61,3 +61,8 @@ This resolves all behavioral and runtime constraints, ensuring robust CI/CD exec
 - **WebSocket Binary Audio**: Implemented true `LINEAR16` PCM audio capturing using `AudioContext` in the browser, streaming it bidirectionally and seamlessly over WebSockets.
 - **Robust Barge-in Pipeline**: Implemented precise generation ID tracking. Interrupting the voice agent now safely flushes downstream TTS buffers and instantly aborts active LLM requests without hanging.
 - **E2E Acceptance Testing**: Integration tests now execute against real external APIs, asserting correctly structured payloads and dynamic model behavior instead of hardcoded strings.
+
+## Phase 6: Full-Fidelity DOM Integration (Final Validation)
+- **Puppeteer E2E Automation**: Tests now instantiate a real headless browser evaluating the exact `public/index.html` frontend, replacing brittle jsdom mock strings and proving real Web Audio API integration.
+- **Audio Fixture Correctness**: Tests inject a structurally-valid, 1-frame RIFF WAV fixture in mock-mode, forcing the underlying `AudioContext.decodeAudioData` execution path to run cleanly without silent buffer errors.
+- **Provider Cancellation**: Extended cancellation controls to strictly use the `AbortController` against the Google AI provider SDK (`model.generateContent`). Client disconnects instantly terminate any active model-generation loop or billing cycles.
