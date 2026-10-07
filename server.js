@@ -33,6 +33,8 @@ wss.on('connection', (ws) => {
   let recognizeStream = null;
   let conversationHistory = [];
 
+  let currentGenController = null;
+
   const startRecognizeStream = () => {
     if (recognizeStream) return;
     if (!sttClient) {
@@ -86,7 +88,8 @@ wss.on('connection', (ws) => {
 
         const prompt = `System context: ${incidentContext}\nYou are an incident responder agent. If the user asks to analyze telemetry or restart a service or check cves, respond with an action tag <ACTION>{"task":"analyze-telemetry"}</ACTION>. Otherwise just answer concisely.\nUser: ${text}`;
         
-        const result = await model.generateContent(prompt);
+        currentGenController = new AbortController();
+        const result = await model.generateContent(prompt, { signal: currentGenController.signal });
         const fullResponse = result.response.text();
         
         const actionMatch = fullResponse.match(/<ACTION>(.*?)<\/ACTION>/);
@@ -139,14 +142,20 @@ wss.on('connection', (ws) => {
           } catch(e) {}
       } else {
           if (genId === currentGenerationId) {
-             ws.send(JSON.stringify({ type: 'tts_mock', generationId: genId, message: 'Mock mode: no audio synthesized' }));
+             // Valid tiny 1-frame WAV base64 fixture to pass decodeAudioData without exceptions
+             const validWavBase64 = "UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+             ws.send(JSON.stringify({ type: 'tts_chunk', generationId: genId, audio: validWavBase64 }));
           }
       }
       
       isGenerating = false;
       
     } catch (e) {
-      console.error(e);
+      if (e.name === 'AbortError') {
+        console.log("LLM generation aborted by user");
+      } else {
+        console.error(e);
+      }
       isGenerating = false;
     }
   };
@@ -157,6 +166,7 @@ wss.on('connection', (ws) => {
         console.log(`Barge-in detected. Canceling turn ${currentGenerationId}.`);
         currentGenerationId++; 
         isGenerating = false;
+        if (currentGenController) currentGenController.abort();
         if (currentTtsController) currentTtsController.abort();
       }
       if (!sttClient) return; // Null-client guard
@@ -167,6 +177,7 @@ wss.on('connection', (ws) => {
       if (data.type === 'barge_in') {
         currentGenerationId++; 
         isGenerating = false;
+        if (currentGenController) currentGenController.abort();
         if (currentTtsController) currentTtsController.abort();
         if (recognizeStream) {
           recognizeStream.end();
@@ -193,6 +204,8 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     if (recognizeStream) recognizeStream.end();
+    if (currentGenController) currentGenController.abort();
+    if (currentTtsController) currentTtsController.abort();
   });
 });
 
