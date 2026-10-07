@@ -7,8 +7,8 @@ async function runTests() {
      env: { ...process.env, LLM_API_KEY: '', LLM_MODEL: '' } // Mock mode
   });
   
-  // Give API 2 seconds to spin up
-  await new Promise(r => setTimeout(r, 2000));
+  // Give API 5 seconds to spin up
+  await new Promise(r => setTimeout(r, 5000));
   console.log("Running Behavioral Tests for Voice Incident Commander...");
 
   // Setup a mock coordinator to count dispatches
