@@ -35,6 +35,10 @@ wss.on('connection', (ws) => {
 
   const startRecognizeStream = () => {
     if (recognizeStream) return;
+    if (!sttClient) {
+      console.warn("STT client not configured. Ignoring binary audio input.");
+      return;
+    }
     recognizeStream = sttClient.streamingRecognize({
       config: {
         encoding: 'WEBM_OPUS',
@@ -126,18 +130,19 @@ wss.on('connection', (ws) => {
       }
       currentTtsController = new AbortController();
 
-      let ttsResponse = null;
       if (ttsClient) {
           try {
              const [res] = await ttsClient.synthesizeSpeech(request, { signal: currentTtsController.signal });
-             ttsResponse = res;
+             if (genId === currentGenerationId) {
+                ws.send(JSON.stringify({ type: 'tts_chunk', generationId: genId, audio: res.audioContent.toString('base64') }));
+             }
           } catch(e) {}
+      } else {
+          if (genId === currentGenerationId) {
+             ws.send(JSON.stringify({ type: 'tts_mock', generationId: genId, message: 'Mock mode: no audio synthesized' }));
+          }
       }
       
-      if (genId !== currentGenerationId) return;
-      
-      const audioBuffer = ttsResponse ? ttsResponse.audioContent : Buffer.from('mock-audio-data');
-      ws.send(JSON.stringify({ type: 'tts_chunk', generationId: genId, audio: audioBuffer.toString('base64') }));
       isGenerating = false;
       
     } catch (e) {
@@ -154,8 +159,9 @@ wss.on('connection', (ws) => {
         isGenerating = false;
         if (currentTtsController) currentTtsController.abort();
       }
+      if (!sttClient) return; // Null-client guard
       if (!recognizeStream) startRecognizeStream();
-      recognizeStream.write(message);
+      if (recognizeStream) recognizeStream.write(message);
     } else {
       const data = JSON.parse(message);
       if (data.type === 'barge_in') {

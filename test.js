@@ -11,6 +11,15 @@ async function runTests() {
   await new Promise(r => setTimeout(r, 2000));
   console.log("Running Behavioral Tests for Voice Incident Commander...");
 
+  // Setup a mock coordinator to count dispatches
+  let mockDispatches = 0;
+  const mockCoordApp = require('express')();
+  mockCoordApp.post('/api/dispatch', (req, res) => {
+      mockDispatches++;
+      res.json({ success: true });
+  });
+  const mockCoord = mockCoordApp.listen(3000);
+
   try {
     const ws1 = new WebSocket('ws://localhost:4005');
     
@@ -25,12 +34,8 @@ async function runTests() {
     await new Promise((resolve, reject) => {
        ws1.on('message', (data) => {
           const msg = JSON.parse(data.toString());
-          if (msg.type === 'action_proposal') {
-             proposalId = msg.proposal.id;
-          }
-          if (msg.type === 'tts_chunk') {
-             ttsReceived = true;
-          }
+          if (msg.type === 'action_proposal') proposalId = msg.proposal.id;
+          if (msg.type === 'tts_chunk' || msg.type === 'tts_mock') ttsReceived = true;
           if (proposalId && ttsReceived) resolve();
        });
        setTimeout(() => reject(new Error("Timeout waiting for proposal and TTS")), 5000);
@@ -47,14 +52,18 @@ async function runTests() {
     
     await new Promise(r => setTimeout(r, 1000)); // wait to see if it processes
     
+    if (mockDispatches > 0) throw new Error("Cross-session approval resulted in a dispatched action!");
+    
     // If we reach here without crashing, and since activeProposals is session-bound, it's secure.
     console.log("✅ Voice Incident Commander passed behavioral tests.");
     ws1.close();
     ws2.close();
     apiProcess.kill();
+    mockCoord.close();
   } catch (err) {
     console.error("❌ Test Failed:", err);
     apiProcess.kill();
+    if (mockCoord) mockCoord.close();
     process.exit(1);
   }
 }
