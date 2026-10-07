@@ -60,9 +60,17 @@
       if (msg.type === 'transcript') {
         currentGenerationId = msg.generationId;
         logToTranscript(msg.text, true);
+      } else if (msg.type === 'action_proposal') {
+        const div = document.createElement('div');
+        div.className = 'agent-msg';
+        div.style.border = '1px solid var(--accent)';
+        div.style.padding = '10px';
+        div.innerHTML = `<strong>Action Proposed:</strong> ${msg.proposal.task}<br>
+        <button onclick="approveAction('${msg.proposal.id}', '${msg.proposal.task}')" style="margin-top: 10px; padding: 5px; background: var(--accent); color: black; border: none; border-radius: 4px; cursor: pointer;">Approve Execution</button>`;
+        transcriptEl.appendChild(div);
+        transcriptEl.scrollTop = transcriptEl.scrollHeight;
       } else if (msg.type === 'tts_chunk') {
         if (msg.generationId === currentGenerationId) {
-          // Play audio
           const binaryString = window.atob(msg.audio);
           const len = binaryString.length;
           const bytes = new Uint8Array(len);
@@ -77,13 +85,16 @@
             source.start();
             playingSources.push(source);
           } catch(e) {
-            console.error("Audio decode error (expected for mock WAV headers)", e);
+            console.error("Audio decode error", e);
           }
-        } else {
-          console.warn(`[BARGE-IN] Discarded stale audio chunk for gen ${msg.generationId}`);
         }
       }
     };
+
+    function approveAction(proposalId, task) {
+      logToTranscript('Action approved: ' + task, false);
+      ws.send(JSON.stringify({ type: 'approve_action', proposal: { id: proposalId, task } }));
+    }
 
     function stopAllAudio() {
       playingSources.forEach(src => {
@@ -95,25 +106,25 @@
     function bargeIn() {
       console.log('User barged in!');
       stopAllAudio();
-      currentGenerationId = null; // Invalidate current locally
+      currentGenerationId = null;
       ws.send(JSON.stringify({ type: 'barge_in' }));
     }
 
     micBtn.onmousedown = async () => {
       if(audioCtx.state === 'suspended') audioCtx.resume();
-      bargeIn(); // Stop bot if speaking
+      bargeIn();
       micBtn.classList.add('recording');
       logToTranscript('Listening...', false);
       
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
         mediaRecorder.ondataavailable = e => {
           if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
             ws.send(e.data);
           }
         };
-        mediaRecorder.start(250); // Send chunks every 250ms
+        mediaRecorder.start(250);
       } catch (err) {
         alert("Microphone access denied or unavailable.");
         micBtn.classList.remove('recording');
@@ -129,9 +140,12 @@
     };
 
     function simulateTextRequest() {
-      bargeIn();
-      logToTranscript('Simulated text query sent.', false);
-      ws.send(JSON.stringify({ type: 'text_input' }));
+      const input = prompt("Enter text query:", "Restart the frontend service");
+      if (input) {
+        bargeIn();
+        logToTranscript('Query: ' + input, false);
+        ws.send(JSON.stringify({ type: 'text_input', text: input }));
+      }
     }
   </script>
 </body>
