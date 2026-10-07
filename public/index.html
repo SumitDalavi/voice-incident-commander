@@ -1,36 +1,138 @@
 <!DOCTYPE html>
-<html>
-<head><title>Voice Commander</title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Voice Incident Commander</title>
+  <style>
+    :root { --bg: #09090b; --panel: #18181b; --text: #fafafa; --accent: #10b981; --danger: #ef4444; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); padding: 20px; display: flex; flex-direction: column; align-items: center; }
+    .commander-interface { background: var(--panel); border-radius: 12px; padding: 30px; width: 100%; max-width: 600px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .mic-button { 
+      background: var(--accent); color: #000; width: 80px; height: 80px; border-radius: 50%; border: none; 
+      font-size: 24px; cursor: pointer; transition: transform 0.2s; margin: 20px 0;
+    }
+    .mic-button:active { transform: scale(0.9); }
+    .mic-button.recording { background: var(--danger); color: white; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+    .transcript { background: #000; padding: 20px; border-radius: 8px; min-height: 150px; text-align: left; font-family: monospace; color: #a1a1aa; margin-top: 20px; overflow-y: auto;}
+    .agent-msg { color: var(--accent); margin-bottom: 10px; }
+    .user-msg { color: #38bdf8; margin-bottom: 10px; }
+  </style>
+</head>
 <body>
-  <h1>Voice Incident Commander</h1>
-  <button id="start">Start Mic</button>
-  <button id="stop">Stop / Barge-in</button>
+  <div class="commander-interface">
+    <h1>Voice Commander</h1>
+    <p>Hold to speak. Release to send. Press while bot is speaking to <strong>Barge-in</strong>.</p>
+    
+    <button class="mic-button" id="mic-btn">🎙️</button>
+    <br>
+    <button onclick="simulateTextRequest()" style="padding: 10px; border-radius: 5px;">Simulate Text Query (Fallback)</button>
+
+    <div class="transcript" id="transcript">
+      <div class="agent-msg">> System initialized. Ready for commands.</div>
+    </div>
+  </div>
+
   <script>
     const ws = new WebSocket('ws://localhost:3000');
     let currentGenerationId = null;
+    let mediaRecorder = null;
+    
+    // Audio playback context
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = new AudioContext();
+    let playingSources = [];
 
-    ws.onmessage = (event) => {
+    const micBtn = document.getElementById('mic-btn');
+    const transcriptEl = document.getElementById('transcript');
+
+    function logToTranscript(text, isAgent=true) {
+      const div = document.createElement('div');
+      div.className = isAgent ? 'agent-msg' : 'user-msg';
+      div.innerText = `> ${text}`;
+      transcriptEl.appendChild(div);
+      transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    }
+
+    ws.onmessage = async (event) => {
       const msg = JSON.parse(event.data);
-      if (msg.type === 'tts_chunk') {
+      
+      if (msg.type === 'transcript') {
+        currentGenerationId = msg.generationId;
+        logToTranscript(msg.text, true);
+      } else if (msg.type === 'tts_chunk') {
         if (msg.generationId === currentGenerationId) {
-          console.log('Playing audio chunk');
+          // Play audio
+          const binaryString = window.atob(msg.audio);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+              bytes[i] = binaryString.charCodeAt(i);
+          }
+          try {
+            const audioBuffer = await audioCtx.decodeAudioData(bytes.buffer);
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioCtx.destination);
+            source.start();
+            playingSources.push(source);
+          } catch(e) {
+            console.error("Audio decode error (expected for mock WAV headers)", e);
+          }
         } else {
-          console.warn('Discarded stale audio chunk from cancelled generation');
+          console.warn(`[BARGE-IN] Discarded stale audio chunk for gen ${msg.generationId}`);
         }
       }
     };
 
-    document.getElementById('start').onclick = () => {
-      console.log('Mic started (dummy)');
-      ws.send(JSON.stringify({ type: 'audio_chunk' }));
-      currentGenerationId = 0; // Sync with server for MVP demo
+    function stopAllAudio() {
+      playingSources.forEach(src => {
+        try { src.stop(); } catch(e){}
+      });
+      playingSources = [];
+    }
+
+    function bargeIn() {
+      console.log('User barged in!');
+      stopAllAudio();
+      currentGenerationId = null; // Invalidate current locally
+      ws.send(JSON.stringify({ type: 'barge_in' }));
+    }
+
+    micBtn.onmousedown = async () => {
+      if(audioCtx.state === 'suspended') audioCtx.resume();
+      bargeIn(); // Stop bot if speaking
+      micBtn.classList.add('recording');
+      logToTranscript('Listening...', false);
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => {
+          if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+            ws.send(e.data);
+          }
+        };
+        mediaRecorder.start(250); // Send chunks every 250ms
+      } catch (err) {
+        alert("Microphone access denied or unavailable.");
+        micBtn.classList.remove('recording');
+      }
     };
 
-    document.getElementById('stop').onclick = () => {
-      console.log('Barge-in sent');
-      ws.send(JSON.stringify({ type: 'barge_in' }));
-      currentGenerationId++; // Invalidate locally
+    micBtn.onmouseup = () => {
+      micBtn.classList.remove('recording');
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(t => t.stop());
+      }
     };
+
+    function simulateTextRequest() {
+      bargeIn();
+      logToTranscript('Simulated text query sent.', false);
+      ws.send(JSON.stringify({ type: 'text_input' }));
+    }
   </script>
 </body>
 </html>
