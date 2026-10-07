@@ -50,11 +50,30 @@ async function runTests() {
     // Wait for console.error output or just ensure server doesn't crash
     ws2.send(JSON.stringify({ type: 'approve_action', proposal: { id: proposalId, task: 'restart-service' } }));
     
-    await new Promise(r => setTimeout(r, 1000)); // wait to see if it processes
+    await new Promise(r => setTimeout(r, 500)); // wait to see if it processes
     
     if (mockDispatches > 0) throw new Error("Cross-session approval resulted in a dispatched action!");
+
+    // Owner approves it
+    console.log("Owner session approving action...");
+    ws1.send(JSON.stringify({ type: 'approve_action', proposal: { id: proposalId, task: 'restart-service' } }));
+    await new Promise(r => setTimeout(r, 500));
     
-    // If we reach here without crashing, and since activeProposals is session-bound, it's secure.
+    if (mockDispatches !== 1) throw new Error(`Owner session approval failed! Expected 1 dispatch, got ${mockDispatches}`);
+    
+    console.log("Testing replay attack...");
+    ws1.send(JSON.stringify({ type: 'approve_action', proposal: { id: proposalId, task: 'restart-service' } }));
+    await new Promise(r => setTimeout(r, 500));
+    
+    if (mockDispatches !== 1) throw new Error(`Replay attack succeeded! Expected 1 dispatch, got ${mockDispatches}`);
+
+    const { spawnSync } = require('child_process');
+    console.log("Running browser audio test via Puppeteer...");
+    const browserProc = spawnSync('node', ['browser-test.js'], { stdio: 'inherit' });
+    if (browserProc.status !== 0) {
+        throw new Error("Browser audio test failed!");
+    }
+
     console.log("✅ Voice Incident Commander passed behavioral tests.");
     ws1.close();
     ws2.close();
