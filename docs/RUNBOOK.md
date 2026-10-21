@@ -66,3 +66,55 @@ This resolves all behavioral and runtime constraints, ensuring robust CI/CD exec
 - **Puppeteer E2E Automation**: Tests now instantiate a real headless browser evaluating the exact `public/index.html` frontend, replacing brittle jsdom mock strings and proving real Web Audio API integration.
 - **Audio Fixture Correctness**: Tests inject a structurally-valid, 1-frame RIFF WAV fixture in mock-mode, forcing the underlying `AudioContext.decodeAudioData` execution path to run cleanly without silent buffer errors.
 - **Provider Cancellation**: Extended cancellation controls to strictly use the `AbortController` against the Google AI provider SDK (`model.generateContent`). Client disconnects instantly terminate any active model-generation loop or billing cycles.
+
+
+## Production Operations & Release Runbook (v0.2.0 Update)
+
+### 1. Production Container Invocation (GHCR)
+```bash
+# Pull production image:
+docker pull ghcr.io/sumitdalavi/voice-incident-commander:v0.2.0
+
+# Run container with Gemini API credentials:
+docker run -d \
+  --name voice-incident-commander \
+  -p 4005:4005 \
+  -e GEMINI_API_KEY="your-gemini-api-key" \
+  ghcr.io/sumitdalavi/voice-incident-commander:v0.2.0
+
+# Note: If no API key is provided, the platform boots in full mock mode for safe offline evaluation.
+```
+
+### 2. Browser Audio Interface & Operational Verification
+1. Open `http://localhost:4005` in Google Chrome or Microsoft Edge.
+2. Grant microphone permissions when prompted.
+3. Click **"Start Voice Session"** and speak:
+   - *"Commander, what is the health status of the payments service?"*
+   - Verify real-time STT transcription and audible TTS voice response.
+4. Test safety confirmation gate:
+   - Speak: *"Commander, delete the malfunctioning pod payment-service-pod-1."*
+   - Observe that the action is **NOT** executed until the on-screen visual confirmation button is clicked.
+5. Test barge-in interruption:
+   - Speak while the commander is talking; verify instant speech interruption and buffer flushing.
+
+### 3. Release Integrity & Verification Runbook
+To verify the authentic origin and file integrity of release packages:
+```bash
+# Download distribution package and checksums:
+gh release download v0.2.0 --repo SumitDalavi/voice-incident-commander --pattern "*.tar.gz" --pattern "checksums.txt"
+
+# Assert cryptographic match:
+sha256sum -c checksums.txt
+
+# Inspect SPDX 2.3 Software Bill of Materials:
+gh release download v0.2.0 --repo SumitDalavi/voice-incident-commander --pattern "sbom.spdx.json"
+cat sbom.spdx.json | jq .packages[0].name
+```
+
+### 4. Operational Failure Modes & Troubleshooting
+- **Port Collisions:** If the host port is in use, remap using `-p <ALTERNATIVE_PORT>:<CONTAINER_PORT>`.
+- **Docker Daemon Permissions:** For tools requiring container orchestrator control (`agent-sandbox-platform`), ensure `/var/run/docker.sock` has read/write permissions for the runner user.
+- **GHCR Pull Authentication:** If pulling from GHCR encounters rate limits or private scope:
+  ```bash
+  echo "$GITHUB_TOKEN" | docker login ghcr.io -u <GITHUB_USERNAME> --password-stdin
+  ```

@@ -1,5 +1,21 @@
 # Architecture: Voice Incident Commander (VIC)
 
+## Architecture Diagram
+
+```mermaid
+graph TD
+    A[Engineer Spoken Voice] --> B[Browser Web Audio API 16kHz PCM]
+    B --> C[Bidirectional WebSocket :4005]
+    C --> D[Google Cloud Speech-to-Text / Mock STT]
+    D --> E[Intent Extraction & Gemini 2.5 Pro Context]
+    E -->|Read-only Query: kubectl get pods| F[Auto-execute & Voice Response]
+    E -->|Mutating Command: kubectl delete pod| G[Mandatory Visual Confirmation Gate]
+    G -->|Engineer Confirmed on UI| H[Execute Cluster Mutation]
+    G -->|Cancelled / Timeout| I[Abort Action & Voice Notify]
+    D -->|User Barge-in Interruption| J[Flush TTS Audio Buffers & Abort LLM Loop]
+```
+
+
 ## Overview
 VIC provides a highly-responsive voice interface for incident command. Its primary technical differentiator is its robust handling of human barge-in (interruption), ensuring that network latency and stale audio buffers never result in the bot talking over the user.
 
@@ -54,3 +70,18 @@ This resolves all behavioral and runtime constraints, ensuring robust CI/CD exec
 - **Puppeteer E2E Automation**: Tests now instantiate a real headless browser evaluating the exact `public/index.html` frontend, replacing brittle jsdom mock strings and proving real Web Audio API integration.
 - **Audio Fixture Correctness**: Tests inject a structurally-valid, 1-frame RIFF WAV fixture in mock-mode, forcing the underlying `AudioContext.decodeAudioData` execution path to run cleanly without silent buffer errors.
 - **Provider Cancellation**: Extended cancellation controls to strictly use the `AbortController` against the Google AI provider SDK (`model.generateContent`). Client disconnects instantly terminate any active model-generation loop or billing cycles.
+
+
+## Release & Container Distribution Architecture (v0.2.0 Update)
+
+### 1. Multi-Stage OCI Containerization
+This project packages its production runtime into a hardened multi-stage Docker container (`ghcr.io/sumitdalavi/voice-incident-commander`):
+- **Base Runtime:** Production-minimal base images (Alpine Linux / Python-slim).
+- **Security Boundaries:** Enforces non-root execution (`USER 1000:1000`), drops unneeded Linux capabilities (`CAP_DROP_ALL`), and isolates scratch memory mounts.
+- **Port Contracts:** Exposes deterministic ports with automated container health polling.
+
+### 2. Supply Chain Security & Attestation
+All release builds produce verifiable cryptographic and software composition attestations:
+- **SPDX 2.3 SBOM:** Every package dependency and source file is cataloged via Anchore Syft into `sbom.spdx.json`.
+- **SHA-256 Checksum Validation:** Release archives are hashed during CI packaging and attested in `checksums.txt`.
+- **Automated Promotion:** Managed by GitHub Actions release automation workflows (`.github/workflows/release.yml`) with tokenized write scopes (`packages: write`, `contents: write`).
