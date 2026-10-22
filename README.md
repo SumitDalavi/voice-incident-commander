@@ -131,7 +131,6 @@ This platform operates in **Dual-Mode**, dynamically selecting between live clou
 | **Text-to-Speech (TTS)** | `GOOGLE_APPLICATION_CREDENTIALS` | Synthesizes neural voice audio streams via Google Cloud Text-to-Speech | Flushes spoken transcripts directly to on-screen console output |
 | **Incident Backend** | `INCIDENT_API_URL` | Routes validated remediation requests to live Incident Agent API (`:4000`) | Binds to bundled mock incident endpoints |
 
-
 ---
 
 ## 👨‍💻 Author
