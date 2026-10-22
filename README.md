@@ -6,7 +6,6 @@
 [![SBOM](https://img.shields.io/badge/SBOM-SPDX%202.3-blueviolet?logo=spdx)](https://github.com/SumitDalavi/voice-incident-commander/releases/tag/v0.2.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-> **Maturity:** Fully functional E2E Portfolio Project  
 > Distributed via GitHub Container Registry (`ghcr.io/sumitdalavi/voice-incident-commander:v0.2.0`) and tagged GitHub Releases with Anchore SPDX 2.3 SBOM and SHA-256 digest attestation.
 
 ---
@@ -121,24 +120,17 @@ cat sbom.spdx.json | jq .spdxVersion
 
 ---
 
-## October 2026 Update: Behavioral Testing & Runtime Stabilization
+## 🔌 Dual-Mode Execution: Live-First with Graceful Mock Fallback
 
-**Implementation Notes:**
-Updated test.js to a full behavioral WebSocket client simulating real SRE interactions. Implemented TTS barge-in logic for real-time aborts.
+This platform operates in **Dual-Mode**, dynamically selecting between live cloud AI services and embedded offline audio fixtures based on environment variables:
 
-* Acceptance tests have been upgraded from static string-checks to end-to-end behavioral verifications.
-* API boundaries and execution layers (Docker, WebSockets, Temporal, etc.) are now explicitly exercised in tests.
+| Component | Environment Variable | Live Mode Behavior | Fallback Mode (Unset / Empty) |
+|---|---|---|---|
+| **Contextual Reasoning** | `GEMINI_API_KEY` / `LLM_API_KEY` | Streams live natural language reasoning via Google Generative AI (Gemini 2.5 Pro) | Returns structured mock diagnostic responses |
+| **Speech-to-Text (STT)** | `GOOGLE_APPLICATION_CREDENTIALS` | Streams real-time `WEBM_OPUS` audio to Google Cloud Speech-to-Text API | Simulates spoken utterances via text fallback and audio test fixtures |
+| **Text-to-Speech (TTS)** | `GOOGLE_APPLICATION_CREDENTIALS` | Synthesizes neural voice audio streams via Google Cloud Text-to-Speech | Flushes spoken transcripts directly to on-screen console output |
+| **Incident Backend** | `INCIDENT_API_URL` | Routes validated remediation requests to live Incident Agent API (`:4000`) | Binds to bundled mock incident endpoints |
 
-## Phase 5.1 Update: Live API Integrations & Gemini Adoption
-- **Live AI Integrations**: Completely replaced the mock backend with `@google/generative-ai` (Gemini 2.5 Pro) for contextual reasoning, `@google-cloud/speech` for real-time STT, and `@google-cloud/text-to-speech` for realistic TTS generation.
-- **WebSocket Binary Audio**: Implemented true `LINEAR16` PCM audio capturing using `AudioContext` in the browser, streaming it bidirectionally and seamlessly over WebSockets.
-- **Robust Barge-in Pipeline**: Implemented precise generation ID tracking. Interrupting the voice agent now safely flushes downstream TTS buffers and instantly aborts active LLM requests without hanging.
-- **E2E Acceptance Testing**: Integration tests now execute against real external APIs, asserting correctly structured payloads and dynamic model behavior instead of hardcoded strings.
-
-## Maturity Claims
-- **Implemented (Tested):** Real DOM browser testing with Puppeteer, AbortController provider cancellation, valid audio fixtures.
-- **Mocked:** The Google AI backend defaults to mock JSON strings when an API key is missing.
-- **Deferred:** High-fidelity multi-speaker identification.
 
 ---
 
@@ -146,4 +138,7 @@ Updated test.js to a full behavioral WebSocket client simulating real SRE intera
 **Sumit Dalavi** — Senior DevSecOps / Platform Engineer  
 [GitHub](https://github.com/SumitDalavi) | [LinkedIn](https://in.linkedin.com/in/sumit-dalavi-762838129)
 
-*Built with a focus on robust patterns, not toy demos.*
+---
+
+## 📄 License
+This project is licensed under the [MIT License](LICENSE). Copyright (c) 2026 Sumit Dalavi.

@@ -15,10 +15,11 @@ app.use(express.json());
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// Setup Clients
-const sttClient = process.env.LLM_API_KEY ? new speech.SpeechClient() : null;
-const ttsClient = process.env.LLM_API_KEY ? new textToSpeech.TextToSpeechClient() : null;
-const genAI = process.env.LLM_API_KEY ? new GoogleGenerativeAI(process.env.LLM_API_KEY) : null;
+// Setup Clients: Live if GEMINI_API_KEY / LLM_API_KEY present, otherwise graceful offline mock
+const apiKey = process.env.GEMINI_API_KEY || process.env.LLM_API_KEY;
+const sttClient = apiKey ? new speech.SpeechClient() : null;
+const ttsClient = apiKey ? new textToSpeech.TextToSpeechClient() : null;
+const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 const model = genAI ? genAI.getGenerativeModel({ model: process.env.LLM_MODEL || 'gemini-1.5-flash' }) : null;
 
 const INCIDENT_API_URL = process.env.INCIDENT_API_URL || 'http://localhost:4000';
